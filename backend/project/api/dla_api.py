@@ -1,27 +1,50 @@
 import cv2
+import fitz
+import pathlib
+import subprocess
+import base64
 import numpy as np
 from flask import Blueprint, jsonify, request
-
+import matplotlib.pyplot as plt
+from io import BytesIO
+from PIL import Image
 from project.predictor import make_predictions
+from pdf2image import convert_from_bytes, convert_from_path
+from PyPDF2 import PdfFileReader, PdfFileWriter
 
 dla_blueprint = Blueprint("", __name__)
 
 
 @dla_blueprint.route("/analyse-image-json", methods=["POST"])
 def analyse_image_json():
-    f = request.files["file"]
+  # Read pdf from request and convert to PyPdf2 PdfFileReader
+  pdfFileFromRequest = request.files["pdf_file"].read()
+  pdfFile = PdfFileReader(BytesIO(pdfFileFromRequest))
+  
+  # Resize all pdf pages
+  for pageNumber in range(pdfFile.getNumPages()):
+    pdfFile.getPage(pageNumber).scaleTo(400, 700)
 
-    img_str = f.read()
+  pdfWriter = PdfFileWriter()
+  pdfWriter.addPage(pdfFile.getPage(0))
+  with open('pdfResized.pdf', 'wb') as f:
+    pdfWriter.write(f)
 
-    nparr = np.frombuffer(img_str, np.uint8)
+  imagesFromPdf = convert_from_bytes(BytesIO(pdfFileFromRequest).read(), size=(400, 700))
 
-    image = cv2.imdecode(nparr, cv2.IMREAD_UNCHANGED)  # BGR format
+  for image in imagesFromPdf:
+    openCVImage = np.array(image) 
+    openCVImage = openCVImage[:, :, ::-1].copy() # Convert RGB to BGR
+    jsonData = make_predictions(openCVImage, True)
+    boundingBoxes = jsonData.get('predictions').get('pred_boxes')
 
-    print(f"Image shape: {image.shape}")
+    for boundingBox in boundingBoxes:
+      print(boundingBox)
+      command = f'pdftotext -x 47 -y 623 -W 168 -H 110 diabetes_pdf.pdf -enc UTF-8'
 
-    if image.shape[2] == 4:
-        image = cv2.cvtColor(image, cv2.COLOR_BGRA2BGR)
+    predictedImage = jsonData.get('img')
+    predictedImage = base64.b64decode(predictedImage)
 
-    json_data = make_predictions(image, True)
-
-    return jsonify(json_data)
+    with open('predictedImage.png', 'wb') as f:
+      f.write(predictedImage)
+    return 'true'

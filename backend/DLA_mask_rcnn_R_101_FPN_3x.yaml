@@ -1,5 +1,5 @@
 # _BASE_: "Base-RCNN-FPN.yaml"
-_BASE_: "/app/lib/python3.8/site-packages/detectron2/model_zoo/configs/Base-RCNN-FPN.yaml"
+_BASE_: "Base-RCNN-FPN.yaml"
 MODEL:
   WEIGHTS: "detectron2://COCO-InstanceSegmentation/mask_rcnn_R_101_FPN_3x/138205316/model_final_a3ec72.pkl"
   MASK_ON: True
