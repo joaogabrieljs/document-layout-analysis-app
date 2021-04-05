@@ -1,15 +1,11 @@
-import cv2
-import fitz
-import pathlib
 import subprocess
 import base64
 import numpy as np
 from flask import Blueprint, jsonify, request
 import matplotlib.pyplot as plt
 from io import BytesIO
-from PIL import Image
 from project.predictor import make_predictions
-from pdf2image import convert_from_bytes, convert_from_path
+from pdf2image import convert_from_bytes
 from PyPDF2 import PdfFileReader, PdfFileWriter
 
 dla_blueprint = Blueprint("", __name__)
@@ -39,8 +35,11 @@ def analyse_image_json():
     boundingBoxes = jsonData.get('predictions').get('pred_boxes')
 
     for boundingBox in boundingBoxes:
-      print(boundingBox)
-      command = f'pdftotext -x 47 -y 623 -W 168 -H 110 diabetes_pdf.pdf -enc UTF-8'
+      pointX = int(boundingBox[0])
+      pointY = int(boundingBox[1])
+      width = int(boundingBox[2]) - pointX
+      height = int(boundingBox[3]) - pointY
+      subprocess.call(['pdftotext', '-x', str(pointX), '-y', str(pointY), '-W', str(width), '-H', str(height), 'pdfResized.pdf', '-enc', 'UTF-8'])
 
     predictedImage = jsonData.get('img')
     predictedImage = base64.b64decode(predictedImage)

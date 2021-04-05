@@ -10,7 +10,7 @@ RUN pip install torch==1.4.0 torchvision==0.5.0 -f https://download.pytorch.org/
 RUN pip install cython
 RUN pip install -U 'git+https://github.com/cocodataset/cocoapi.git#subdirectory=PythonAPI'
 
-# Detectron2 - CPU copy
+# Detectron2 - GPU copy
 RUN python -m pip install detectron2 -f https://dl.fbaipublicfiles.com/detectron2/wheels/cu101/index.html
 
 # Development packages
