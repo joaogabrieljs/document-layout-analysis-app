@@ -1,4 +1,4 @@
-import subprocess
+from subprocess import check_output
 import base64
 import numpy as np
 from flask import Blueprint, jsonify, request
@@ -22,6 +22,7 @@ def analyse_image_json():
     pdfFile.getPage(pageNumber).scaleTo(400, 700)
 
   pdfWriter = PdfFileWriter()
+  #pdfWriter.addAttachment('pdfResized.pdf', pdfFile)
   pdfWriter.addPage(pdfFile.getPage(0))
   with open('pdfResized.pdf', 'wb') as f:
     pdfWriter.write(f)
@@ -32,18 +33,34 @@ def analyse_image_json():
     openCVImage = np.array(image) 
     openCVImage = openCVImage[:, :, ::-1].copy() # Convert RGB to BGR
     jsonData = make_predictions(openCVImage, True)
-    boundingBoxes = jsonData.get('predictions').get('pred_boxes')
+    predictions = jsonData.get('predictions')
+    boundingBoxes = sort_bounding_boxes(predictions.get('pred_boxes'))
 
-    for boundingBox in boundingBoxes:
+    jsonParagraphs = {}
+    for index, boundingBox in enumerate(boundingBoxes):
+      paragraph = {}
       pointX = int(boundingBox[0])
       pointY = int(boundingBox[1])
       width = int(boundingBox[2]) - pointX
       height = int(boundingBox[3]) - pointY
-      subprocess.call(['pdftotext', '-x', str(pointX), '-y', str(pointY), '-W', str(width), '-H', str(height), 'pdfResized.pdf', '-enc', 'UTF-8'])
+      paragraph['text'] = check_output(['pdftotext', '-x', str(pointX), '-y', str(pointY), '-W', str(width), '-H', str(height), 'pdfResized.pdf', '-enc', 'UTF-8', '-'])
+      paragraph['score'] = predictions.get('scores')[index]
+      paragraph['type'] = get_prediction_type(predictions.get('pred_classes')[index])
+      jsonParagraphs[index] = paragraph
+  return jsonify(jsonParagraphs)
 
-    predictedImage = jsonData.get('img')
-    predictedImage = base64.b64decode(predictedImage)
+def sort_bounding_boxes(boundingBoxes):
+  npArrayBoundingBoxes = np.array(boundingBoxes)   
+  index = np.lexsort((npArrayBoundingBoxes[:,0], npArrayBoundingBoxes[:,1])) 
+  sortedBoundingBoxes = npArrayBoundingBoxes[index]
+  return sortedBoundingBoxes
 
-    with open('predictedImage.png', 'wb') as f:
-      f.write(predictedImage)
-    return 'true'
+def get_prediction_type(type):
+  switcher = {
+    0: 'text',
+    1: 'title',
+    2: 'figure',
+    3: 'table'
+  }
+  return switcher.get(type, 'nothing')
+
